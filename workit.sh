@@ -29,7 +29,7 @@ BASEDIR=`dirname $0`
 #source $BASEDIR/process_functions.sh
 
 # You can override this setting in your .zshrc/.bashrc
-if [ "$WORKIT_DIRS" = "" ]
+if [[ "$WORKIT_DIRS" == "" ]]
 then
     WORKIT_DIRS=( "$HOME/src" "$HOME/configs" "$HOME/gitbox" )
 	export WORKIT_DIRS
@@ -191,7 +191,7 @@ function show_workit_projects () {
     #       into the output list.
     all=()
     for tpath in ${WORKIT_DIRS[@]}; do
-        echo -e "Workit directory ${WORKIT_DIRS[$i]}:"
+        echo -e "Workit directory ${tpath}:"
         echo -e "----------------------------------------"
         ls --color=auto -C $tpath
         echo -e "\n"
