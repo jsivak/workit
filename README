@@ -1,3 +1,8 @@
+BASH-ization of workit
+----------------------
+
+
+
 Workit is a blatant rip off of Doug Hellmann's virtualenv wrapper:
 http://www.doughellmann.com/projects/virtualenvwrapper/
 

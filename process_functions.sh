@@ -119,10 +119,3 @@ function zmysql_start () {
     return 1
 }
 
-# ctags
-function zctags () {
-    
-
-}
-
-

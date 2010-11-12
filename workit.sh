@@ -5,6 +5,9 @@
 #
 # set -x
 
+# Shell check; mitechie LOVES zsh, so we need to accommodate. :)
+CUR_SHELL="$( ps | grep $$ | awk '{ print $4 }' )"
+
 # TODO
 # virtualenv sets the VIRTUAL_ENV system variable, need to replicate a bit
 
@@ -13,10 +16,10 @@
 BASEDIR=`dirname $0`
 source $BASEDIR/process_functions.sh
 
-# You can override this setting in your .zshrc
+# You can override this setting in your .zshrc/.bashrc
 if [ "$WORKIT_HOME" = "" ]
 then
-	WORKIT_HOME=( "$HOME/src" "$HOME/configs" )
+    WORKIT_HOME=( "$HOME/src" "$HOME/configs" "$HOME/gitbox" )
 	export WORKIT_HOME
 fi
 
@@ -36,7 +39,7 @@ fi
 
 # Verify that the WORKON_HOME directory exists
 function verify_workit_home () {
-    for zpath in $WORKIT_HOME; do
+    for zpath in ${WORKIT_HOME[@]}; do
         if [ ! -d "$zpath" ]
         then
             echo "ERROR: projects directory '$zpath' does not exist." >&2
@@ -48,11 +51,11 @@ function verify_workit_home () {
 
 # Verify that the requested project exists
 function verify_workit_project () {
-    typeset env_name="$1"
+    env_name="$1"
     proj_count=0
     proj_list=()
 
-    for zpath in $WORKIT_HOME; do
+    for zpath in ${WORKIT_HOME[@]}; do
         target_path="$zpath/$env_name"
         if [[ -d $target_path ]]; then
             proj_list+=("$target_path")
@@ -61,7 +64,7 @@ function verify_workit_project () {
     done
 
     if [[ $proj_count -eq 1 ]]; then
-        echo  "$proj_list[1]"
+        echo  "${proj_list[0]}"
         return 0
     else
         select item in $proj_list
@@ -116,15 +119,15 @@ function mkworkit () {
     verify_workit_home || return 1
 
     if [[ "$1" == "" ]]; then
-        echo "\nUsage: mkworkit [project_name]\n"
+        echo -e "\nUsage: mkworkit [project_name]\n"
         return 1
     fi
 
-    workit_home_count=${#WORKIT_HOME}
+    workit_home_count=${#WORKIT_HOME[*]}
 
     if [ $workit_home_count -gt 1 ]
     then
-        select proj_path in $WORKIT_HOME
+        select proj_path in ${WORKIT_HOME[@]}
         do
             case "$proj_path" in
                 *)
@@ -169,20 +172,17 @@ function show_workit_projects () {
     # NOTE: DO NOT use ls here because colorized versions spew control characters
     #       into the output list.
     all=()
-    for ((i=1;i<=${#WORKIT_HOME};i++)); do
-        echo "\n========================================"
-        echo "Workit directory $WORKIT_HOME[$i]:\n"
-        ls --color=auto -C $WORKIT_HOME[$i]
-        #dirs=$( cd "$WORKIT_HOME[$i]"; for f in *; do [[ -d $f ]] && echo $f; done )
-        #all+=("\n\n$dirs")
+    for tpath in ${WORKIT_HOME[@]}; do
+        echo -e "Workit directory ${WORKIT_HOME[$i]}:"
+        echo -e "----------------------------------------"
+        ls --color=auto -C $tpath
     done
-    #echo $all
 }
 
 # list the available workit home directories for adding a new project to
 function show_workit_home_options () {
     verify_workit_home || return 1
-    for ((i=1;i<=${#WORKIT_HOME};i++)); do
+    for ((i=1;i<${#WORKIT_HOME[*]};i++)); do
         proj=${WORKIT_HOME[$i]}
         echo "$i - $proj"
     done
@@ -193,7 +193,7 @@ function show_workit_home_options () {
 # Usage: workit [environment_name]
 #
 function workit () {
-	typeset PROJ_NAME="$1"
+	PROJ_NAME="$1"
 
 	if [ "$PROJ_NAME" = "" ]
     then
@@ -202,13 +202,13 @@ function workit () {
     fi
 
 	PROJ_PATH=$( verify_workit_project "$PROJ_NAME" )
+    echo -e "PROJ_PATH: $PROJ_PATH"
     if [ ! -d $PROJ_PATH ]
     then
         return 1
     else
         export PROJ_PATH
     fi
-
 
     verify_workit_home || return 1
 
@@ -255,4 +255,6 @@ function workit () {
 # Set up tab completion.  (Adapted from Arthur Koziel's version at 
 # http://arthurkoziel.com/2008/10/11/virtualenvwrapper-bash-completion/)
 # 
-compctl -g "`show_workit_projects`" workit 
+if [[ $CUR_SHELL == "zsh" ]]; then
+    compctl -g "`show_workit_projects`" workit 
+fi
