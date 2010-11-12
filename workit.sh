@@ -5,6 +5,18 @@
 #
 # set -x
 
+# In order to support for multiple users with their own scripts in the same project
+# we are going to store all workit processing scripts in the following
+# directory structure:
+#   [project name]/.workit/[username]/[hostname]
+#
+# Where [project name] is your project
+#       [username] is the system username you logged in with
+#       [hostname] is the hostname of the system
+#
+# This allows a team of developers to work on the same project and have 
+# differnt activation scripts to suit their own needs
+
 # Shell check; mitechie LOVES zsh, so we need to accommodate. :)
 CUR_SHELL="$( ps | grep $$ | awk '{ print $4 }' )"
 
@@ -14,7 +26,7 @@ CUR_SHELL="$( ps | grep $$ | awk '{ print $4 }' )"
 # source the helper script functions
 # assuming its in the same dir as this file
 BASEDIR=`dirname $0`
-source $BASEDIR/process_functions.sh
+#source $BASEDIR/process_functions.sh
 
 # You can override this setting in your .zshrc/.bashrc
 if [ "$WORKIT_HOME" = "" ]
@@ -92,12 +104,13 @@ function verify_active_project () {
 }
 
 # source the pre/post hooks
+# NOTE: This function expects the FULL path to the script
 function workit_source_hook () {
     scriptname="$1"
     
-    if [ -f ".workit/$scriptname" ]
+    if [ -f "$scriptname" ]
     then
-        source ".workit/$scriptname"
+        source "$scriptname"
     fi
 }
 
@@ -141,22 +154,27 @@ function mkworkit () {
 
     eval "projname=\$$#"
 
-    proj_workit_path="$proj_path/$projname/.workit"
+    proj_workit_path="$proj_path/$projname"
+    SCRIPT_PATH=$( build_workit_script_path "$proj_workit_path" )
 
     # test for existing proj dir, if not create it, otherwise add 
     # the post* script files to the existing dir
-    if [ ! -d $proj_workit_path ]
+    if [ ! -d $SCRIPT_PATH ]
     then
         (cd "$proj_path" &&
-        mkdir -p "$proj_workit_path"
+        mkdir -p "$SCRIPT_PATH"
         )
     else
-        (cd "$proj_workit_path")
+        (cd "$SCRIPT_PATH")
     fi
 
-    touch "$proj_workit_path/postactivate" &&
-    touch "$proj_workit_path/postdeactivate" &&
-    chmod +x "$proj_workit_path/postactivate" "$proj_workit_path/postdeactivate" 
+    if [[ ! -d $SCRIPT_PATH ]]; then
+        mkdir -p "$SCRIPT_PATH"
+    fi
+
+    touch "${SCRIPT_PATH}/activate" &&
+    touch "${SCRIPT_PATH}/deactivate" &&
+    chmod +x "${SCRIPT_PATH}/activate" "${SCRIPT_PATH}/deactivate" 
 
     # If they passed a help option or got an error from virtualenv,
     # the environment won't exist.  Use that to tell whether
@@ -202,7 +220,6 @@ function workit () {
     fi
 
 	PROJ_PATH=$( verify_workit_project "$PROJ_NAME" )
-    echo -e "PROJ_PATH: $PROJ_PATH"
     if [ ! -d $PROJ_PATH ]
     then
         return 1
@@ -215,13 +232,14 @@ function workit () {
     # Deactivate any current environment "destructively"
     # before switching so we use our override function,
     # if it exists.
-    type deactivate >/dev/null 2>&1
+    type workdone >/dev/null 2>&1
     if [ $? -eq 0 ]
     then
-        deactivate
+        workdone
     fi
     
     cd $PROJ_PATH
+    SCRIPT_PATH=$( build_workit_script_path "$PROJ_PATH" )
 
     # Save the deactivate function from virtualenv
     # virtualenvwrapper_saved_deactivate=$(typeset -f deactivate)
@@ -244,11 +262,21 @@ function workit () {
     #     virtualenvwrapper_source_hook "$env_postdeactivate_hook"
         workit_source_hook "postdeactivate"
     }'
+
+    eval 'function workdone () {
+        workit_source_hook "'$SCRIPT_PATH'/deactivate"
+    }'
     
-    workit_source_hook "postactivate"
-#    workit_source_hook "$project/postactivate"    
+    workit_source_hook "$SCRIPT_PATH/activate"
     
 	return 0
+}
+
+function build_workit_script_path () {
+    base_path="$1"
+    WORKIT_HOST=$(hostname -s)
+    SCRIPT_PATH="$base_path/.workit/${USERNAME}/${WORKIT_HOST}"
+    echo $SCRIPT_PATH
 }
 
 #
