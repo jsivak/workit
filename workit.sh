@@ -194,6 +194,7 @@ function show_workit_projects () {
         echo -e "Workit directory ${WORKIT_HOME[$i]}:"
         echo -e "----------------------------------------"
         ls --color=auto -C $tpath
+        echo -e "\n"
     done
 }
 
