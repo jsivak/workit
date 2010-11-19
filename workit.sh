@@ -25,7 +25,7 @@ CUR_SHELL="$( ps | grep $$ | awk '{ print $4 }' )"
 
 # source the helper script functions
 # assuming its in the same dir as this file
-BASEDIR=`dirname $0`
+#BASEDIR=`dirname $0`
 #source $BASEDIR/process_functions.sh
 
 # You can override this setting in your .zshrc/.bashrc
@@ -51,13 +51,12 @@ fi
 
 # Verify that the WORKON_HOME directory exists
 function verify_workit_home () {
-    for zpath in ${WORKIT_DIRS[@]}; do
-        if [ ! -d "$zpath" ]
-        then
-            echo "ERROR: projects directory '$zpath' does not exist." >&2
-            return 1
-        fi
-    done
+    #for zpath in ${WORKIT_DIRS[@]}; do
+    #    if [ ! -d "$zpath" ]
+    #    then
+    #        echo "WARNING: projects directory '$zpath' does not exist." >&2
+    #    fi
+    #done
     return 0
 }
 
@@ -70,7 +69,9 @@ function verify_workit_project () {
     for zpath in ${WORKIT_DIRS[@]}; do
         target_path="$zpath/$env_name"
         if [[ -d $target_path ]]; then
-            proj_list+=("$target_path")
+            #proj_list+=("$target_path")
+            # BASH version 3 doesn't like the += operator
+            proj_list=($proj_list "$target_path")
             ((proj_count+=1))
         fi
     done
@@ -193,7 +194,11 @@ function show_workit_projects () {
     for tpath in ${WORKIT_DIRS[@]}; do
         echo -e "Workit directory ${tpath}:"
         echo -e "----------------------------------------"
-        ls --color=auto -C $tpath
+        if [[ -d $tpath ]]; then
+            ls --color=auto -C $tpath
+        else
+            echo -e "Directory ${tpath} doesn't exist"
+        fi
         echo -e "\n"
     done
 }
@@ -241,28 +246,6 @@ function workit () {
     
     cd $PROJ_PATH
     SCRIPT_PATH=$( build_workit_script_path "$PROJ_PATH" )
-
-    # Save the deactivate function from virtualenv
-    # virtualenvwrapper_saved_deactivate=$(typeset -f deactivate)
-
-    # Replace the deactivate() function with a wrapper.
-    eval 'function deactivate () {
-    #     # Call the local hook before the global so we can undo
-    #     # any settings made by the local postactivate first.
-    #     virtualenvwrapper_source_hook "$VIRTUAL_ENV/bin/predeactivate"
-    #     virtualenvwrapper_source_hook "$WORKON_HOME/predeactivate"
-    #     
-    #     env_postdeactivate_hook="$VIRTUAL_ENV/bin/postdeactivate"
-    #     
-    #     # Restore the original definition of deactivate
-    #     eval "$virtualenvwrapper_saved_deactivate"
-
-    #     # Instead of recursing, this calls the now restored original function.
-    #     deactivate
-
-    #     virtualenvwrapper_source_hook "$env_postdeactivate_hook"
-        workit_source_hook "postdeactivate"
-    }'
 
     eval 'function workdone () {
         workit_source_hook "'$SCRIPT_PATH'/deactivate"
