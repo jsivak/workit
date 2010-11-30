@@ -66,6 +66,15 @@ function verify_workit_project () {
     proj_count=0
     proj_list=()
 
+    if [[ "${USER}" == "" ]]; then
+        echo -e "Can't determine user name based on USER environment variable."
+        return 1
+    fi
+    WORKIT_HOST="$(hostname -s)"
+    if [[ "${WORKIT_HOST}" == "" ]]; then
+        echo -e "Can't determine hostname based on 'hostname -s' command."
+        return 1
+    fi
     for zpath in ${WORKIT_DIRS[@]}; do
         target_path="$zpath/$env_name"
         if [[ -d $target_path ]]; then
@@ -77,14 +86,14 @@ function verify_workit_project () {
     done
 
     if [[ $proj_count -eq 1 ]]; then
-        echo  "${proj_list[0]}"
+        RET_VAL="${proj_list[0]}"
         return 0
     else
         select item in $proj_list
         do
             case "$item" in
                 *)
-                echo "$item"
+                RET_VAL="$item"
                 break
                 ;;
             esac
@@ -156,7 +165,8 @@ function mkworkit () {
     eval "projname=\$$#"
 
     proj_workit_path="$proj_path/$projname"
-    SCRIPT_PATH=$( build_workit_script_path "$proj_workit_path" )
+    build_workit_script_path "$proj_workit_path" 
+    SCRIPT_PATH=$RET_VAL
 
     # test for existing proj dir, if not create it, otherwise add 
     # the post* script files to the existing dir
@@ -225,12 +235,12 @@ function workit () {
         return 1
     fi
 
-	PROJ_PATH=$( verify_workit_project "$PROJ_NAME" )
-    if [ ! -d $PROJ_PATH ]
+    if verify_workit_project "$PROJ_NAME" 
     then
-        return 1
-    else
+        PROJ_PATH=$RET_VAL
         export PROJ_PATH
+    else
+        return 1
     fi
 
     verify_workit_home || return 1
@@ -238,16 +248,17 @@ function workit () {
     # Deactivate any current environment "destructively"
     # before switching so we use our override function,
     # if it exists.
-    type workdone >/dev/null 2>&1
+    type workitdone >/dev/null 2>&1
     if [ $? -eq 0 ]
     then
-        workdone
+        workitdone
     fi
     
     cd $PROJ_PATH
-    SCRIPT_PATH=$( build_workit_script_path "$PROJ_PATH" )
+    build_workit_script_path "$PROJ_PATH" 
+    SCRIPT_PATH=$RET_VAL
 
-    eval 'function workdone () {
+    eval 'function workitdone () {
         workit_source_hook "'$SCRIPT_PATH'/deactivate"
     }'
     
@@ -259,8 +270,12 @@ function workit () {
 function build_workit_script_path () {
     base_path="$1"
     WORKIT_HOST=$(hostname -s)
-    SCRIPT_PATH="$base_path/.workit/${USERNAME}/${WORKIT_HOST}"
-    echo $SCRIPT_PATH
+    if [[ "${USER}" == "" ]]; then
+        echo -e "Can't determine user name based on USER environment variable."
+        RET_VAL=""
+    else
+        RET_VAL="$base_path/.workit/${USER}/${WORKIT_HOST}"
+    fi
 }
 
 #
