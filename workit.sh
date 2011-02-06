@@ -107,7 +107,7 @@ function verify_active_project () {
 # NOTE: This function expects the FULL path to the script
 function workit_source_hook () {
     scriptname="$1"
-    
+
     if [ -f "$scriptname" ]
     then
         source "$scriptname"
@@ -136,14 +136,11 @@ function mkworkit () {
     fi
 
     # check if we're given a direct path
-    if [[ "$1" == */* || "$1" == "." ]]; then
+    if [[ "$1" == */* || "$1" == "." || "$1" == ".." ]]; then
         DIRECT=1
-        # Allow the current working directory to be specified.
-        if [[ "$1" == "." ]]; then
-            PROJ_PATH="$PWD"
-        else
-            PROJ_PATH="$1"
-        fi
+
+        canonpath "$1"
+        PROJ_PATH="$RET_VAL"
 
         if [[ -d "$PROJ_PATH" ]]; then
             echo "workit: mkworkit setting up on direct path $PROJ_PATH"
@@ -159,7 +156,7 @@ function mkworkit () {
 
         if [ $workit_home_count -gt 1 ]
         then
-            OLD_IFS=$IFS
+            OLD_IFS="$IFS"
             # Remove the space from the IFS so we can show a "None / Cancel" option
             IFS=$'\t\n'
             DIR_LIST=('None / Cancel')
@@ -176,20 +173,20 @@ function mkworkit () {
                         ;;
                 esac
             done
-            IFS=$OLD_IFS
+            IFS="$OLD_IFS"
         else
             PROJ_PATH=$WORKIT_DIRS
         fi
 
         PROJ_NAME="$1"
         PROJ_PATH="$PROJ_PATH/$PROJ_NAME"
-        echo "workit: mkworkit setting up  $PROJ_NAME in WORKIT_DIRS path ${PROJ_PATH%/*}"
+        echo "workit: mkworkit setting up $PROJ_NAME from WORKIT_DIRS path [${PROJ_PATH%/*}]"
     fi
 
-    build_workit_script_path "$PROJ_PATH" 
+    build_workit_script_path "$PROJ_PATH"
     SCRIPT_PATH=$RET_VAL
 
-    # test for existing proj dir, if not create it, otherwise add 
+    # test for existing proj dir, if not create it, otherwise add
     # the script files to the existing dir
     if [[ ! -d $SCRIPT_PATH ]]; then
         mkdir -p "$SCRIPT_PATH"
@@ -201,10 +198,10 @@ function mkworkit () {
     FILES="activate deactivate"
     for FILE in $FILES; do
         if [[ ! -f "${SCRIPT_PATH}/$FILE" ]]; then
-            touch "${SCRIPT_PATH}/$FILE" 
+            touch "${SCRIPT_PATH}/$FILE"
         fi
         if [[ ! -x "${SCRIPT_PATH}/$FILE" ]]; then
-            chmod +x "${SCRIPT_PATH}/$FILE" 
+            chmod +x "${SCRIPT_PATH}/$FILE"
         fi
     done
 
@@ -214,6 +211,7 @@ function mkworkit () {
     else
         workit "$PROJ_PATH"
     fi
+
 }
 
 # List the available environments.
@@ -221,7 +219,7 @@ function show_workit_projects () {
     verify_workit_home || return 1
     # NOTE: DO NOT use ls here because colorized versions spew control characters
     #       into the output list.
-    # Handle case where we just want to see the contents of 1 specified 
+    # Handle case where we just want to see the contents of 1 specified
     # directory.
     if [[ "$1" != "" ]]; then
         tpath=$1
@@ -264,14 +262,15 @@ function workit () {
 	PROJ_NAME="$1"
 
     # check if a path was provided; if so then just try to "workit" directly on that path
-    if [[ "$PROJ_NAME" == */* || "$PROJ_NAME" == "." ]]; then
+    if [[ "$PROJ_NAME" == */* || "$PROJ_NAME" == "." || "$PROJ_NAME" == ".." ]]; then
         # Allow the current working directory to be specified.
-        if [[ "$PROJ_NAME" == "." ]]; then
-            PROJ_NAME="$PWD"
-        fi
+        canonpath "$PROJ_NAME"
+        PROJ_NAME="$RET_VAL"
+
         if [[ -d "$PROJ_NAME" ]]; then
             echo "workit: activating direct path $PROJ_NAME"
-            PROJ_PATH="${PROJ_NAME}"
+            canonpath "$PROJ_NAME"
+            PROJ_PATH="$RET_VAL"
         else
             echo "workit: Can't find $PROJ_NAME"
             return 1
@@ -282,7 +281,7 @@ function workit () {
             workit_home_count=${#WORKIT_DIRS[*]}
             if [ $workit_home_count -gt 1 ]
             then
-                OLD_IFS=$IFS
+                OLD_IFS="$IFS"
                 # Remove the space from the IFS so we can show a "None / Cancel" option
                 IFS=$'\t\n'
                 DIR_LIST=('None / Cancel')
@@ -305,7 +304,7 @@ function workit () {
                             ;;
                     esac
                 done
-                IFS=$OLD_IFS
+                IFS="$OLD_IFS"
             else
                 PROJ_PATH=$WORKIT_DIRS
             fi
@@ -314,7 +313,7 @@ function workit () {
             return 1
         fi
 
-        if verify_workit_project "$PROJ_NAME" 
+        if verify_workit_project "$PROJ_NAME"
         then
             PROJ_PATH=$RET_VAL
         else
@@ -323,8 +322,8 @@ function workit () {
 
         verify_workit_home || return 1
 
-        echo "workit: activating $PROJ_NAME in WORKIT_DIRS path ${PROJ_PATH%/*}"
-                                                           
+        echo "workit: activating $PROJ_NAME from WORKIT_DIRS path [${PROJ_PATH%/*}]"
+
     fi
 
     # Deactivate any current environment "destructively"
@@ -335,18 +334,25 @@ function workit () {
     then
         workitdone
     fi
-    
+
     cd $PROJ_PATH
-    build_workit_script_path "$PROJ_PATH" 
+
+    # Set prompt
+    OLD_PS1="$PS1"
+    PS1="[workit]$PS1"
+
+    build_workit_script_path "$PROJ_PATH"
     SCRIPT_PATH=$RET_VAL
 
     eval 'function workitdone () {
         workit_source_hook "'$SCRIPT_PATH'/deactivate"
         unset workitdone
+        # Remote the prompt add-on
+        PS1="${PS1/\[workit\]/}"
     }'
-    
+
     workit_source_hook "$SCRIPT_PATH/activate"
-    
+
 	return 0
 }
 
@@ -361,10 +367,16 @@ function build_workit_script_path () {
     fi
 }
 
+# from: http://snipplr.com/view/18026/canonical-absolute-path/
+function canonpath ()
+{
+    RET_VAL=$(cd $(dirname $1); pwd -P)/$(basename $1)
+}
+
 #
-# Set up tab completion.  (Adapted from Arthur Koziel's version at 
+# Set up tab completion.  (Adapted from Arthur Koziel's version at
 # http://arthurkoziel.com/2008/10/11/virtualenvwrapper-bash-completion/)
-# 
+#
 if [[ $CUR_SHELL == "zsh" ]]; then
-    compctl -g "`show_workit_projects`" workit 
+    compctl -g "`show_workit_projects`" workit
 fi
