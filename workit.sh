@@ -79,7 +79,7 @@ function verify_workit_project () {
         RET_VAL="${proj_list[0]}"
         return 0
     else
-        select item in $proj_list
+        select item in "${proj_list[@]}"
         do
             case "$item" in
                 *)
@@ -276,8 +276,7 @@ function workit () {
             return 1
         fi
     else
-        if [ "$PROJ_NAME" = "" ]
-        then
+        if [[ "$PROJ_NAME" == "" ]]; then
             workit_home_count=${#WORKIT_DIRS[*]}
             if [ $workit_home_count -gt 1 ]
             then
