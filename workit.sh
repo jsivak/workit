@@ -76,7 +76,33 @@ function verify_workit_project () {
         fi
     done
 
-    if [[ $proj_count -eq 1 ]]; then
+    # If we didn't find the project name, then check for "project_name_ve"
+    if [[ $proj_count == 0 ]]; then
+        env_name_ve="${env_name}_ve"
+        echo "${env_name} not found, searching for ${env_name_ve}.."
+        for zpath in ${WORKIT_DIRS[@]}; do
+            target_path="$zpath/${env_name_ve}"
+            if [[ -d $target_path ]]; then
+                #proj_list+=("$target_path")
+                # BASH version 3 doesn't like the += operator
+                proj_list=($proj_list "$target_path")
+                ((proj_count+=1))
+            fi
+        done
+    fi
+
+    if [[ $proj_count == 0 ]]; then
+        create_project "$PROJ_NAME"
+        if [[ $RET_VAL == 1 ]]; then
+            return 1
+        else
+            # Treat this like a direct path mkworkit
+            canonpath "$PROJ_NAME"
+            PROJ_PATH="$RET_VAL"
+            mkworkit "$PROJ_PATH"
+            return 1
+        fi
+    elif [[ $proj_count -eq 1 ]]; then
         RET_VAL="${proj_list[0]}"
         return 0
     else
@@ -102,6 +128,19 @@ function verify_active_project () {
         return 1
     fi
     return 0
+}
+
+function create_project()
+{
+    PROJ_PATH="$1"
+    echo "workit: Can't find $PROJ_PATH"
+    read -e -n 1 -p "Create it? (y/N) " CREATE_PROJ_PATH
+    if [[ $CREATE_PROJ_PATH == "y" || $CREATE_PROJ_PATH == "Y" ]]; then
+        mkdir -p $PROJ_PATH
+        RET_VAL=0
+    else
+        RET_VAL=1
+    fi
 }
 
 # source the pre/post hooks
@@ -201,11 +240,16 @@ function mkworkit () {
     FILES="activate deactivate"
     for FILE in $FILES; do
         if [[ ! -f "${SCRIPT_PATH}/$FILE" ]]; then
-            touch "${SCRIPT_PATH}/$FILE"
+            # Check for default templates
+            if [[ -f $HOME/configs/bash/workit.templates/$FILE ]]; then
+                cp $HOME/configs/bash/workit.templates/$FILE "${SCRIPT_PATH}"
+            else
+                touch "${SCRIPT_PATH}/$FILE"
+            fi
         fi
-        if [[ ! -x "${SCRIPT_PATH}/$FILE" ]]; then
-            chmod +x "${SCRIPT_PATH}/$FILE"
-        fi
+        #if [[ ! -x "${SCRIPT_PATH}/$FILE" ]]; then
+        #    chmod +x "${SCRIPT_PATH}/$FILE"
+        #fi
     done
 
     # Now actually switch/workit into our new project
