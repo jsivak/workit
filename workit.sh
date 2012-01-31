@@ -53,6 +53,7 @@ function verify_workit_project () {
     env_name="$1"
     proj_count=0
     proj_list=()
+    RET_VAL=""
 
     # Sanity chcks
     if [[ "${USER}" == "" ]]; then
@@ -145,8 +146,10 @@ function mkworkit () {
         if [[ -d "$PROJ_PATH" ]]; then
             echo "workit: mkworkit setting up on direct path $PROJ_PATH"
         else
-            echo "workit: Can't find $PROJ_PATH"
-            return 1
+            create_project "$PROJ_PATH"
+            if [[ $RET_VAL == 1 ]]; then
+                return 1
+            fi
         fi
     else
         DIRECT=0
@@ -258,7 +261,7 @@ function show_workit_home_options () {
 #
 # Usage: workit [environment_name]
 #
-function workit () {
+function workit() {
 	PROJ_NAME="$1"
 
     # check if a path was provided; if so then just try to "workit" directly on that path
@@ -272,8 +275,12 @@ function workit () {
             canonpath "$PROJ_NAME"
             PROJ_PATH="$RET_VAL"
         else
-            echo "workit: Can't find $PROJ_NAME"
-            return 1
+            create_project "$PROJ_PATH"
+            if [[ $RET_VAL == 1 ]]; then
+                return 1
+            else
+                mkworkit $PROJ_NAME
+            fi
         fi
     else
         if [[ "$PROJ_NAME" == "" ]]; then
