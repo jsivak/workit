@@ -159,8 +159,8 @@ function mkworkit () {
             OLD_IFS="$IFS"
             # Remove the space from the IFS so we can show a "None / Cancel" option
             IFS=$'\t\n'
-            DIR_LIST=('None / Cancel')
-            DIR_LIST+=("${WORKIT_DIRS[@]}")
+            # BASH version 3 doesn't like the += operator
+            DIR_LIST=('None / Cancel' "${WORKIT_DIRS[@]}")
             select PROJ_PATH in ${DIR_LIST[@]}
             do
                 case "$PROJ_PATH" in
@@ -283,9 +283,8 @@ function workit () {
                 OLD_IFS="$IFS"
                 # Remove the space from the IFS so we can show a "None / Cancel" option
                 IFS=$'\t\n'
-                DIR_LIST=('None / Cancel')
-                DIR_LIST+=('All')
-                DIR_LIST+=("${WORKIT_DIRS[@]}")
+                # BASH version 3 doesn't like the += operator
+                DIR_LIST=('None / Cancel' 'All' "${WORKIT_DIRS[@]}")
                 echo "Select a directory to see available projects"
                 select PROJ_PATH in ${DIR_LIST[@]}
                 do
